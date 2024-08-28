@@ -24,7 +24,6 @@ u2 read_u2(FILE *class_file) {
 u4 read_u4(FILE *class_file) {
     return (u4) read_u2(class_file) << 16 | read_u2(class_file);
 }
-
 u2 constant_pool_size(cp_info *constant_pool) {
     cp_info *constant = constant_pool;
     while (constant->info != NULL) {
@@ -33,6 +32,13 @@ u2 constant_pool_size(cp_info *constant_pool) {
     return constant - constant_pool;
 }
 
+/**
+ * @brief Retrieves a constant from the constant pool by index.
+ * 
+ * @param constant_pool Pointer to the constant pool array.
+ * @param index The index of the constant to retrieve (1-indexed).
+ * @return A pointer to the requested constant pool entry.
+ */
 cp_info *get_constant(cp_info *constant_pool, u2 index) {
     assert(0 < index && index <= constant_pool_size(constant_pool) &&
            "Invalid constant pool index");
@@ -40,6 +46,13 @@ cp_info *get_constant(cp_info *constant_pool, u2 index) {
     return &constant_pool[index - 1];
 }
 
+/**
+ * @brief Retrieves the name and type information for a method from the constant pool.
+ * 
+ * @param constant_pool Pointer to the constant pool array.
+ * @param index The index of the method in the constant pool (1-indexed).
+ * @return A pointer to the CONSTANT_NameAndType_info structure for the method.
+ */
 CONSTANT_NameAndType_info *get_method_name_and_type(cp_info *constant_pool, u2 index) {
     cp_info *method_constant = get_constant(constant_pool, index);
     assert(method_constant->tag == CONSTANT_Methodref && "Expected a MethodRef");
@@ -51,6 +64,12 @@ CONSTANT_NameAndType_info *get_method_name_and_type(cp_info *constant_pool, u2 i
     return name_and_type_constant->info;
 }
 
+/**
+ * @brief Calculates the number of parameters in a method descriptor.
+ * 
+ * @param method Pointer to the method structure.
+ * @return The number of parameters in the method descriptor.
+ */
 u2 get_number_of_parameters(const method_t *method) {
     // Type descriptors will always have the length ( + #params + ) + return type
     char *end = strchr(method->descriptor, ')');
@@ -68,6 +87,14 @@ u2 get_number_of_parameters(const method_t *method) {
     return params;
 }
 
+/**
+ * @brief Finds a method by its name and descriptor in the class.
+ * 
+ * @param name The name of the method to find.
+ * @param descriptor The descriptor of the method to find.
+ * @param class Pointer to the class structure containing the methods.
+ * @return A pointer to the found method, or NULL if not found.
+ */
 method_t *find_method(const char *name, const char *descriptor,
                       const class_file_t *class) {
     for (method_t *method = class->methods; method->name != NULL; method++) {
@@ -79,6 +106,13 @@ method_t *find_method(const char *name, const char *descriptor,
     return NULL;
 }
 
+/**
+ * @brief Finds a method by its index in the constant pool.
+ * 
+ * @param index The index of the method in the constant pool.
+ * @param class Pointer to the class structure containing the constant pool and methods.
+ * @return A pointer to the found method, or NULL if not found.
+ */
 method_t *find_method_from_index(u2 index, const class_file_t *class) {
     CONSTANT_NameAndType_info *name_and_type =
         get_method_name_and_type(class->constant_pool, index);
@@ -90,6 +124,12 @@ method_t *find_method_from_index(u2 index, const class_file_t *class) {
     return find_method(name->info, descriptor->info, class);
 }
 
+/**
+ * @brief Reads the header information of a class file.
+ * 
+ * @param class_file Pointer to the open class file.
+ * @return A class_header_t structure containing the header information.
+ */
 class_header_t get_class_header(FILE *class_file) {
     class_header_t header;
     header.magic = read_u4(class_file);
@@ -99,6 +139,12 @@ class_header_t get_class_header(FILE *class_file) {
     return header;
 }
 
+/**
+ * @brief Reads the constant pool from a class file.
+ * 
+ * @param class_file Pointer to the open class file.
+ * @return A pointer to the allocated constant pool array.
+ */
 cp_info *get_constant_pool(FILE *class_file) {
     // Constant pool count includes unused constant at index 0
     u2 constant_pool_count = read_u2(class_file) - 1;
@@ -168,6 +214,12 @@ cp_info *get_constant_pool(FILE *class_file) {
     return constant_pool;
 }
 
+/**
+ * @brief Reads the class information section from a class file.
+ * 
+ * @param class_file Pointer to the open class file.
+ * @return A class_info_t structure containing the class information.
+ */
 class_info_t get_class_info(FILE *class_file) {
     class_info_t info;
     info.access_flags = read_u2(class_file);
@@ -180,6 +232,14 @@ class_info_t get_class_info(FILE *class_file) {
     return info;
 }
 
+/**
+ * @brief Reads and processes the attributes of a method.
+ * 
+ * @param class_file Pointer to the open class file.
+ * @param info Pointer to the method_info structure containing method details.
+ * @param code Pointer to the code_t structure where method code will be stored.
+ * @param constant_pool Pointer to the constant pool array.
+ */
 void read_method_attributes(FILE *class_file, method_info *info, code_t *code,
                             cp_info *constant_pool) {
     bool found_code = false;
@@ -208,6 +268,13 @@ void read_method_attributes(FILE *class_file, method_info *info, code_t *code,
     assert(found_code && "Missing method code");
 }
 
+/**
+ * @brief Reads the methods section of a class file.
+ * 
+ * @param class_file Pointer to the open class file.
+ * @param constant_pool Pointer to the constant pool array.
+ * @return A pointer to the allocated methods array.
+ */
 method_t *get_methods(FILE *class_file, cp_info *constant_pool) {
     u2 method_count = read_u2(class_file);
     method_t *methods = malloc(sizeof(method_t[method_count + 1]));
@@ -246,6 +313,12 @@ method_t *get_methods(FILE *class_file, cp_info *constant_pool) {
     return methods;
 }
 
+/**
+ * @brief Parses a class file and constructs a class_file_t structure.
+ * 
+ * @param class_file Pointer to the open class file.
+ * @return A pointer to the allocated class_file_t structure.
+ */
 class_file_t *get_class(FILE *class_file) {
     class_file_t *class = malloc(sizeof(*class));
     assert(class != NULL && "Failed to allocate class");
@@ -267,6 +340,11 @@ class_file_t *get_class(FILE *class_file) {
     return class;
 }
 
+/**
+ * @brief Frees the memory allocated for a class_file_t structure.
+ * 
+ * @param class Pointer to the class_file_t structure to free.
+ */
 void free_class(class_file_t *class) {
     for (cp_info *constant = class->constant_pool; constant->info != NULL; constant++) {
         free(constant->info);
